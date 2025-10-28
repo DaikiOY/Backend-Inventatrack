@@ -1,0 +1,11 @@
+package com.inventatrack.platform.inventory.application.internal.commandservices;
+
+import com.inventatrack.platform.inventory.domain.model.commands.CreateInventoryCommand;
+import com.inventatrack.platform.inventory.domain.model.aggregates.Inventory;
+
+public interface InventoryCommandService {
+    Inventory handle(CreateInventoryCommand command);
+    Inventory updateInventory(Long id, CreateInventoryCommand command);
+    boolean deleteById(Long id);
+    boolean deleteProductFromInventory(Long inventoryId, Long productId);
+}
