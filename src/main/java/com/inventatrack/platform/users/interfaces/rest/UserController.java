@@ -4,10 +4,17 @@ import com.inventatrack.platform.users.application.internal.commandservices.User
 import com.inventatrack.platform.users.application.internal.queryservices.UserQueryServiceImpl;
 import com.inventatrack.platform.users.domain.model.aggregates.User;
 import com.inventatrack.platform.users.domain.model.commands.CreateUserCommand;
+import com.inventatrack.platform.users.domain.model.commands.UpdateUserCommand;
+import com.inventatrack.platform.users.domain.model.commands.UpdateUserPasswordCommand;
 import com.inventatrack.platform.users.interfaces.rest.resources.CreateUserResource;
+import com.inventatrack.platform.users.interfaces.rest.resources.UpdateUserResource;
 import com.inventatrack.platform.users.interfaces.rest.resources.UserResource;
 import com.inventatrack.platform.users.interfaces.rest.transform.CreateUserCommandFromResourceAssembler;
+import com.inventatrack.platform.users.interfaces.rest.transform.UpdateUserCommandFromResourceAssembler;
 import com.inventatrack.platform.users.interfaces.rest.transform.UserResourceFromEntityAssembler;
+import static com.inventatrack.platform.users.interfaces.rest.messages.UserMessages.*;
+
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,10 +52,57 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<UserResource> createUser(@RequestBody CreateUserResource resource) {
-        CreateUserCommand command = CreateUserCommandFromResourceAssembler.toCommandFromResource(resource);
-        User user = userCommandService.handle(command);
-        UserResource userResource = UserResourceFromEntityAssembler.toResourceFromEntity(user);
-        return ResponseEntity.created(URI.create("/api/v1/users/" + userResource.id())).body(userResource);
+    public ResponseEntity<String> createUser(@RequestBody CreateUserResource resource) {
+        try {
+            CreateUserCommand command = CreateUserCommandFromResourceAssembler.toCommandFromResource(resource);
+            User user = userCommandService.handle(command);
+            return ResponseEntity
+                    .created(URI.create("/api/v1/users/" + user.getId()))
+                    .body(String.format(USER_CREATED, user.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(String.format(USER_CREATE_ERROR, e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody UpdateUserResource resource) {
+        try {
+            UpdateUserCommand command = UpdateUserCommandFromResourceAssembler.toCommandFromResource(id, resource);
+            userCommandService.handle(command);
+            return ResponseEntity.ok(String.format(USER_UPDATED, id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(String.format(USER_NOT_FOUND, id));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(String.format(USER_UPDATE_ERROR, e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/password")
+    public ResponseEntity<String> updateUserPassword(@PathVariable Long id, @RequestBody String newPassword) {
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(PASSWORD_EMPTY);
+        }
+
+        try {
+            var command = new UpdateUserPasswordCommand(id, newPassword);
+            userCommandService.handle(command);
+            return ResponseEntity.ok(String.format(PASSWORD_UPDATED, id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(String.format(USER_NOT_FOUND, id));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(String.format(PASSWORD_UPDATE_ERROR, e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteUser(@PathVariable Long id) {
+        try {
+            userCommandService.deleteById(id);
+            return ResponseEntity.ok(String.format(USER_DELETED, id));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(String.format(USER_NOT_FOUND, id));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(String.format(USER_DELETE_ERROR, e.getMessage()));
+        }
     }
 }
